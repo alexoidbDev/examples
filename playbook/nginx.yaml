@@ -1,0 +1,36 @@
+---
+- name: Configure Nginx Web Server
+  hosts: webservers
+  become: true
+  vars:
+    nginx_port: 80
+    nginx_server_name: api.example.local
+
+  tasks:
+    - name: Install Nginx package (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Copy customized Nginx configuration template
+      ansible.builtin.template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Restart Nginx
+
+    - name: Ensure Nginx service is enabled and running
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted

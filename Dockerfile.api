@@ -1,0 +1,35 @@
+# --- Build stage) ---
+FROM node:24-alpine AS build
+
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+COPY core/api-libs /app/core/api-libs
+COPY api /app/api
+
+WORKDIR /app/api
+ARG ENV_NAME
+RUN yarn ${ENV_NAME}-build
+
+WORKDIR /app
+RUN yarn install --production --frozen-lockfile --ignore-scripts
+
+# --- Слой релиза (Release stage) ---
+FROM node:24-alpine AS release
+
+RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
+ENV NODE_ENV=production
+
+COPY --from=build /app/node_modules /app/node_modules
+COPY --from=build /app/package.json /app/yarn.lock /app/
+
+WORKDIR /app/api
+COPY --from=build /app/api/dist ./dist
+
+# Переключаемся на встроенного безопасного пользователя node
+USER node
+EXPOSE 3000
+
+
+CMD ["node", "dist/server.js"]

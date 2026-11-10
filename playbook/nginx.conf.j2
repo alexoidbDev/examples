@@ -1,0 +1,46 @@
+user user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    server_tokens off;
+
+    # Node.js API
+    upstream node_api {
+        server {{ node_api_host | default('127.0.0.1') }}:{{ node_api_port | default(3000) }};
+        keepalive 32;
+    }
+
+    server {
+        listen {{ nginx_port | default(80) }};
+        server_name {{ nginx_server_name | default('localhost') }};
+
+        access_log /var/log/nginx/api_access.log;
+        error_log /var/log/nginx/api_error.log warn;
+
+        location / {
+            proxy_pass http://node_api;
+            
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+        }
+
+    }
+}
